@@ -1,0 +1,89 @@
+description: >
+  Install custom versions of Node.js, and optionally NPM/Yarn, in any
+  execution environment (Docker/Linux, macOS, machine) that does not have
+  it preinstalled
+
+parameters:
+  # node
+  node-version:
+    type: string
+    default: latest
+    description: >
+      Specific version of Node.js to install. Note: version-selection is
+      not supported for Alpine Linux-based execution environments, as
+      Node.js's Linux binaries are not compiled to run on Alpine. Use the
+      `alpine-version` parameter to select from a limited number of
+      Alpine-based Node.js packages. Otherwise, for a full list of
+      releases, see the following: https://nodejs.org/en/download/releases
+
+  node-alpine-version:
+    type: enum
+    default: nodejs-current
+    enum: [nodejs, nodejs-current]
+    description: >
+      For Alpine Linux users, select a Node.js version: either a current
+      stable release, or a slightly older stable release. For more
+      information, see https://pkgs.alpinelinux.org/packages?name=nodejs*
+
+  node-install-dir:
+    type: string
+    default: /usr/local
+    description: >
+      Where should Node.js be installed?
+
+  debug:
+    type: boolean
+    default: false
+    description: >
+      Extra output for orb developers
+
+  # npm
+  install-npm:
+    type: boolean
+    default: true
+    description: Install NPM?
+
+  npm-version:
+    type: string
+    default: latest
+    description: >
+      Pick a version of NPM to install:
+      https://nodejs.org/en/download/releases
+      (Note: NPM version selection is not possible on Alpine Linux;
+      on Alpine, the `npm` Alpine pkg will be installed:
+      https://pkgs.alpinelinux.org/packages?name=npm)
+
+  # yarn
+  install-yarn:
+    type: boolean
+    default: true
+    description: Install Yarn?
+
+  yarn-version:
+    type: string
+    default: ""
+    description: >
+      Pick a version of Yarn to install (if no version is specified,
+      the latest stable version will be installed):
+      https://github.com/yarnpkg/yarn/releases
+
+steps:
+  - install-node:
+      version: <<parameters.node-version>>
+      alpine-version: <<parameters.node-alpine-version>>
+      install-dir: <<parameters.node-install-dir>>
+      debug: <<parameters.debug>>
+
+  - when:
+      condition: <<parameters.install-npm>>
+      steps:
+        - install-npm:
+            version: <<parameters.npm-version>>
+            debug: <<parameters.debug>>
+
+  - when:
+      condition: <<parameters.install-yarn>>
+      steps:
+        - install-yarn:
+            version: <<parameters.yarn-version>>
+            debug: <<parameters.debug>>

@@ -1,0 +1,103 @@
+description: >
+  Install a custom version of the Yarn package manager
+
+parameters:
+  version:
+    type: string
+    default: ""
+    description: >
+      Pick a version of Yarn to install (if no version is specified,
+      the latest stable version will be installed):
+      https://github.com/yarnpkg/yarn/releases
+
+  debug:
+    type: boolean
+    default: false
+    description: >
+      Extra output for orb developers
+
+steps:
+  - run:
+      name: Install Yarn
+      command: |
+        if [[ $EUID == 0 ]]; then export SUDO=""; else export SUDO="sudo"; fi
+
+        # FUNCTIONS
+        get_yarn_version () {
+          if [[ "<<parameters.version>>" == "" ]]; then
+            VERSION=$(curl --silent --show-error \
+              --location --fail --retry 3 \
+              https://api.github.com/repos/yarnpkg/yarn/releases/latest | \
+              grep tag_name | cut -d '"' -f 4 | \
+              cut -d 'v' -f 2)
+
+            echo "Latest version of Yarn is $VERSION"
+          else
+            VERSION=<<parameters.version>>
+
+            echo "Selected version of Yarn is $VERSION"
+          fi
+        }
+
+        installation_check () {
+          if command -v yarn<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>; then
+            if yarn --version | grep "$VERSION"<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>; then
+              echo "Yarn $VERSION is already installed"
+              exit 0
+            else
+              echo "A different version of Yarn is installed ($(yarn --version)); removing it"
+
+              if uname -a | grep Darwin<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>; then
+                brew uninstall yarn<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>
+              elif cat /etc/issue | grep Alpine<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>; then
+                apk del yarn<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>
+              elif cat /etc/issue | grep Debian<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>; then
+                $SUDO apt-get remove yarn<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>> && \
+                  $SUDO apt-get purge yarn<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>
+              elif cat /etc/issue | grep Ubuntu<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>; then
+                $SUDO apt-get remove yarn<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>> && \
+                  $SUDO apt-get purge yarn<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>
+              elif command -v yum<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>; then
+                yum remove yarn<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>
+              fi
+
+              $SUDO rm -rf "$HOME/.yarn"<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>
+              $SUDO rm -f /usr/local/bin/yarn /usr/local/bin/yarnpkg<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>
+            fi
+          fi
+        }
+
+        get_yarn_version
+        installation_check
+
+        # install yarn
+        curl -L -o yarn.tar.gz "https://yarnpkg.com/downloads/$VERSION/yarn-v$VERSION.tar.gz"
+
+        $SUDO tar -xzf yarn.tar.gz && rm yarn.tar.gz
+
+        $SUDO mkdir -p /opt/yarn
+
+        $SUDO mv yarn-v${VERSION}/* /opt/yarn
+
+        $SUDO rm -rf "yarn-v${VERSION}"
+
+        $SUDO chmod 777 "/opt/yarn"
+
+        $SUDO ln -s /opt/yarn/bin/yarn /usr/local/bin/yarn
+        $SUDO ln -s /opt/yarn/bin/yarnpkg /usr/local/bin/yarnpkg
+        $SUDO ln -s /opt/yarn/bin/yarn.js /usr/local/bin/yarn.js
+
+        command -v yarn
+
+        if uname -a | grep Darwin<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>; then
+          mkdir -p ~/.config
+          $SUDO chown -R "$USER:$GROUP" ~/.config
+        fi
+
+        # test/verify version
+        if yarn --version | grep "$VERSION"<<^parameters.debug>> > /dev/null 2>&1<</parameters.debug>>; then
+          echo "Success! Yarn $(yarn --version) has been installed to $(which yarn)"
+        else
+          echo "Something went wrong; the specified version of Yarn could not be installed"
+          exit 1
+        fi
